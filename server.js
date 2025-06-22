@@ -1,4 +1,5 @@
 const express = require("express");
+const bodyParser = require("body-parser");
 const app = express();
 const cors = require("cors");
 const corsOptions = {
@@ -6,10 +7,12 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+app.use(bodyParser.json());
 
-app.get("/api", (req, res) => {
-  res.json({ "fruits": ["apple", "orange", "banana"] });
-
+app.post("/api/log-workout", (req, res) => {
+  console.log(req.body);
+  let {exercises} = req.body;
+  res.json({"message": "Form Submitted"});
 });
 
 
