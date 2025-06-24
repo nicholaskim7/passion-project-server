@@ -2,7 +2,8 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const app = express();
 require('dotenv').config();
-const mysql = require("mysql2/promise");
+//const mysql = require("mysql2/promise");
+const { Pool } = require("pg");
 const cors = require("cors");
 const corsOptions = {
   origin: ["http://localhost:5173"], // only accept requests from our frontend server
@@ -11,11 +12,12 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(bodyParser.json());
 
-const db = mysql.createPool({
+const db = new Pool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME
+  database: process.env.DB_NAME,
+  port: process.env.DB_PORT || 5432,
 });
 
 app.post("/api/log-workout", async (req, res) => {
@@ -24,66 +26,69 @@ app.post("/api/log-workout", async (req, res) => {
   const userId = 1; //hardcoded user
   const workoutDate = new Date(); 
 
-  const conn = await db.getConnection();
+  // const conn = await db.getConnection();
+  const client = await db.connect();
+
   try {
-    await conn.beginTransaction();
+    // await conn.beginTransaction();
+     await client.query('BEGIN');
 
     // insert workout
-    const [workoutResult] = await conn.execute(
-      `INSERT INTO workouts (userId, date) VALUES (?, ?)`, [userId, workoutDate]
+    const workoutResult = await client.query(
+      `INSERT INTO workouts (userId, date) VALUES ($1, $2) RETURNING id`, [userId, workoutDate]
     );
-    const workoutId = workoutResult.insertId;
+    const workoutId = workoutResult.rows[0].id;
 
     // loop through each exercise
     for (const [exerciseName, sets] of Object.entries(exercises)) {
-      const [rows] = await conn.execute(
+      const exerciseResult = await client.query(
         // check if the exercise is already in the db
-        `SELECT Id FROM exercises WHERE exerciseName = ?`, [exerciseName]
+        `SELECT Id FROM exercises WHERE exerciseName = $1`, [exerciseName]
       );
 
       let exerciseId;
-      if (rows.length > 0) { // if exercise is already in db
-        exerciseId = rows[0].Id; // get the id
+      if (exerciseResult.length > 0) { // if exercise is already in db
+        exerciseId = exerciseResult.rows[0].id; // get the id
       } else {
         //otherwise insert the new exercise
-        const [insertExercise] = await conn.execute(
-          `INSERT INTO exercises (exerciseName, ExerciseCategory) VALUES (?, ?)`, [exerciseName, "Uncategorized"]
+        const insertExerciseResult = await client.query(
+          `INSERT INTO exercises (exerciseName, ExerciseCategory) VALUES ($1, $2) RETURNING id`, [exerciseName, "Uncategorized"]
         );
-        exerciseId = insertExercise.insertId;
+        exerciseId = insertExerciseResult.rows[0].id;
       }
 
       // insert into workoutExercises
-      const [workoutExerciseResult] = await conn.execute(
-        `INSERT INTO workoutexercises (workoutId, exerciseId) VALUES (?, ?)`, [workoutId, exerciseId] // linking workout session with the exercise id
+      const workoutExerciseResult = await client.query(
+        `INSERT INTO workoutexercises (workoutId, exerciseId) VALUES ($1, $2) RETURNING id`, [workoutId, exerciseId] // linking workout session with the exercise id
       );
-      const workoutExerciseId = workoutExerciseResult.insertId;
+      const workoutExerciseId = workoutExerciseResult.rows[0].id;
 
       // insert each set
       for (const set of sets) {
         const reps = parseInt(set.reps, 10); // extract the reps
         const weight = parseFloat(set.weight); // extract the weight of each set
 
-        await conn.execute(
-          `INSERT INTO sets (workoutExerciseId, reps, weight) VALUES (?, ?, ?)`, [workoutExerciseId, reps, weight] // linking sets to each exercise done in the workout session
+        await client.query(
+          `INSERT INTO sets (workoutExerciseId, reps, weight) VALUES ($1, $2, $3)`, [workoutExerciseId, reps, weight] // linking sets to each exercise done in the workout session
         );
       }
     }
-    await conn.commit();
+    await client.query('COMMIT');
     res.json({"message": "Workout logged successfully"}); //response that client will receive
 
   } catch (err) {
     console.error("Error logging workout:", err);
-    await conn.rollback();
+    await client.query('ROLLBACK');
     res.status(500).json({ error: "Failed to log workout" });
   } finally {
-    conn.release();
+    client.release();
   }
 });
 
 
 app.get("/api/fetch-workouts", async (req, res) => {
   // Get all workouts for a specific user
-  const conn = await db.getConnection();
+  // const conn = await db.getConnection();
   const userId = 1; //hardcoded user
   try {
     const [workouts] = await conn.query('SELECT * FROM workouts WHERE userId = ?', [userId]); // rows of recorded workouts with date
@@ -137,7 +142,7 @@ app.get("/api/fetch-workouts", async (req, res) => {
 
 //fetch users prs for bench, squat, deadlift
 app.get("/api/fetch-prs", async (req, res) => {
-  const conn = await db.getConnection();
+  // const conn = await db.getConnection();
   const userId = 1; //hardcoded user
   try {
     const [prRows] = await conn.query(`
@@ -150,8 +155,8 @@ app.get("/api/fetch-prs", async (req, res) => {
           s.weight,
           w.date,
           ROW_NUMBER() OVER (
-            PARTITION BY e.exerciseName
-            ORDER BY s.weight DESC, s.reps DESC
+            PARTITION BY e.exerciseName            -- group by exercise name
+            ORDER BY s.weight DESC, s.reps DESC    -- order by weight lifted and if tie then order by number of reps
           ) AS rn
         FROM sets s
         JOIN workoutexercises we ON s.workoutExerciseId = we.Id
