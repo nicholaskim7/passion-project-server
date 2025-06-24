@@ -53,10 +53,10 @@ app.post("/api/log-workout", async (req, res) => {
       }
 
       // insert into workoutExercises
-      const [workExRes] = await conn.execute(
-        `INSERT INTO workoutexercises (workoutId, exerciseId) VALUES (?, ?)`, [workoutId, exerciseId]
+      const [workoutExerciseResult] = await conn.execute(
+        `INSERT INTO workoutexercises (workoutId, exerciseId) VALUES (?, ?)`, [workoutId, exerciseId] // linking workout session with the exercise id
       );
-      const workoutExerciseId = workExRes.insertId;
+      const workoutExerciseId = workoutExerciseResult.insertId;
 
       // insert each set
       for (const set of sets) {
@@ -64,7 +64,7 @@ app.post("/api/log-workout", async (req, res) => {
         const weight = parseFloat(set.weight); // extract the weight of each set
 
         await conn.execute(
-          `INSERT INTO sets (workoutExerciseId, reps, weight) VALUES (?, ?, ?)`, [workoutExerciseId, reps, weight]
+          `INSERT INTO sets (workoutExerciseId, reps, weight) VALUES (?, ?, ?)`, [workoutExerciseId, reps, weight] // linking sets to each exercise done in the workout session
         );
       }
     }
@@ -124,6 +124,58 @@ app.get("/api/fetch-workouts", async (req, res) => {
     }
 
     //console.log(JSON.stringify(finalData, null, 2));
+    res.json(finalData);
+
+  } catch (err) {
+    console.error("Error executing query", err);
+    res.status(500).json({ error: 'Error fetching workouts' });
+  } finally {
+    conn.release();
+  }
+});
+
+
+//fetch users prs for bench, squat, deadlift
+app.get("/api/fetch-prs", async (req, res) => {
+  const conn = await db.getConnection();
+  const userId = 1; //hardcoded user
+  try {
+    const [prRows] = await conn.query(`
+      SELECT exerciseName, exerciseCategory, reps, weight, date
+      FROM (
+        SELECT
+          e.exerciseName,
+          e.exerciseCategory,
+          s.reps,
+          s.weight,
+          w.date,
+          ROW_NUMBER() OVER (
+            PARTITION BY e.exerciseName
+            ORDER BY s.weight DESC, s.reps DESC
+          ) AS rn
+        FROM sets s
+        JOIN workoutexercises we ON s.workoutExerciseId = we.Id
+        JOIN exercises e ON we.exerciseId = e.id
+        JOIN workouts w ON we.workoutId = w.id
+        WHERE e.exerciseName IN ("Bench Press", "Barbell Squat", "Deadlift")
+        AND w.userId = ?
+      ) ranked
+      WHERE rn = 1
+    `, [userId]);
+    
+    const finalData = [];
+
+    for (const pr of prRows) {
+      finalData.push({
+        key: pr.exerciseName,
+        name: pr.exerciseName,
+        category: pr.exerciseCategory,
+        reps: pr.reps,
+        weight: pr.weight,
+        date: pr.date
+      });
+    }
+    // console.log(JSON.stringify(finalData, null, 2));
     res.json(finalData);
 
   } catch (err) {
