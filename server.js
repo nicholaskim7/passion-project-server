@@ -78,7 +78,62 @@ app.post("/api/log-workout", async (req, res) => {
   } finally {
     conn.release();
   }
-})
+});
+
+
+app.get("/api/fetch-workouts", async (req, res) => {
+  // Get all workouts for a specific user
+  const conn = await db.getConnection();
+  const userId = 1; //hardcoded user
+  try {
+    const [workouts] = await conn.query('SELECT * FROM workouts WHERE userId = ?', [userId]); // rows of recorded workouts with date
+
+    const finalData = [];
+
+    // For each workout, fetch its associated workout exercises:
+    for (const workout of workouts) {
+      const workoutId = workout.id;
+
+      const [workoutExercises] = await conn.query('SELECT * FROM workoutexercises WHERE workoutId = ?', [workoutId]); // workoutExercises
+
+      const detailedExercises = [];
+      
+      // For each workout exercise, fetch the exercise details:
+      for (const we of workoutExercises) {
+        const exerciseId = we.exerciseId;
+
+        const [exerciseRows] = await conn.query('SELECT * FROM exercises WHERE id = ?', [exerciseId]); // exercises done in that particular workout
+
+        const exercise = exerciseRows[0];
+
+        // Then fetch the sets for each workoutExerciseId:
+        const [setRows] = await conn.query('SELECT reps, weight FROM sets WHERE workoutExerciseId = ?', [we.Id]);
+
+        detailedExercises.push({
+          name: exercise.exerciseName,
+          category: exercise.exerciseCategory,
+          sets: setRows
+        });
+      }
+
+      finalData.push({
+        workoutId,
+        date: workout.date,
+        exercises: detailedExercises
+      });
+    }
+
+    //console.log(JSON.stringify(finalData, null, 2));
+    res.json(finalData);
+
+  } catch (err) {
+    console.error("Error executing query", err);
+    res.status(500).json({ error: 'Error fetching workouts' });
+  } finally {
+    conn.release();
+  }
+});
+
 
 
 app.listen(8080, () => {
