@@ -19,6 +19,7 @@ const db = new Pool({
   port: process.env.DB_PORT || 5432,
 });
 
+//debug database connection 
 app.get("/debug/db", async (req, res) => {
   const client = await db.connect();
   try {
@@ -72,7 +73,7 @@ app.post("/api/log-workout", async (req, res) => {
       } else {
         //otherwise insert the new exercise
         const insertExerciseResult = await client.query(
-          `INSERT INTO exercises (exercisename, Exercisecategory) VALUES ($1, $2) RETURNING id`, [exerciseName, "Uncategorized"]
+          `INSERT INTO exercises (exercisename, Exercisecategory) VALUES ($1, $2) RETURNING id`, [exerciseName, "Strength"]
         );
         exerciseId = insertExerciseResult.rows[0].id;
       }
@@ -106,6 +107,69 @@ app.post("/api/log-workout", async (req, res) => {
 });
 
 
+app.post("/api/log-cardio", async (req, res) => {
+  const cardioExercises = req.body;
+  const userId = 1; //hardcoded user
+  const workoutDate = new Date();
+  //console.log(cardioExercises)
+
+  const client = await db.connect();
+  
+  try {
+    await client.query('BEGIN');
+
+    // insert workout
+    const workoutResult = await client.query(
+      `INSERT INTO workouts (userid, date) VALUES ($1, $2) RETURNING id`, [userId, workoutDate]
+    );
+    const workoutId = workoutResult.rows[0].id;
+
+    // loop through each exercise
+    for (const [exerciseName, entry] of Object.entries(cardioExercises)) {
+      const cardioExerciseResult = await client.query(
+        // check if the exercise is already in the db
+        `SELECT id FROM exercises WHERE exercisename = $1`, [exerciseName]
+      );
+
+      let exerciseId;
+      if (cardioExerciseResult.rows.length > 0) { // if exercise is already in db
+        exerciseId = cardioExerciseResult.rows[0].id; // get the id
+      } else {
+        //otherwise insert the new exercise
+        const insertCardioExerciseResult = await client.query(
+          `INSERT INTO exercises (exercisename, Exercisecategory) VALUES ($1, $2) RETURNING id`, [exerciseName, "Cardio"]
+        );
+        exerciseId = insertCardioExerciseResult.rows[0].id;
+      }
+
+      // insert into workoutExercises
+      const workoutExerciseResult = await client.query(
+        `INSERT INTO workoutexercises (workoutid, exerciseid) VALUES ($1, $2) RETURNING id`, [workoutId, exerciseId] // linking workout session with the exercise id
+      );
+      const workoutExerciseId = workoutExerciseResult.rows[0].id;
+
+      // insert duration and calories burned into cardio
+      
+      const duration = parseInt(entry.duration, 10); // extract the duration
+      const caloriesBurned = parseFloat(entry.caloriesBurned); // extract the calories burned
+
+        await client.query(
+          `INSERT INTO cardio (workoutexerciseid, duration_minutes, calories_burned) VALUES ($1, $2, $3)`, [workoutExerciseId, duration, caloriesBurned] // linking duration and cal burned to each cardio exercise done in the workout session
+        );
+    }
+    await client.query('COMMIT');
+    res.json({"message": "Cardio Workout logged successfully"}); //response that client will receive
+
+
+  } catch (err) {
+    console.error("Error logging cardio workout:", err);
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: "Failed to log cardio workout" });
+  } finally {
+    client.release();
+  }
+});
+
 
 app.get("/api/fetch-workouts", async (req, res) => {
   // Get all workouts for a specific user
@@ -136,13 +200,21 @@ app.get("/api/fetch-workouts", async (req, res) => {
         const exercise = exerciseRowsResult.rows[0];
 
         // Then fetch the sets for each workoutExerciseId:
-        const setRowsResult = await client.query('SELECT reps, weight FROM sets WHERE workoutexerciseid = $1', [we.id]);
-
-        detailedExercises.push({
-          name: exercise.exercisename,
-          category: exercise.exercisecategory,
-          sets: setRowsResult.rows
-        });
+        if (exercise.exercisecategory == "Strength") { // see if we need to fetch from sets or from cardio
+          const setRowsResult = await client.query('SELECT reps, weight FROM sets WHERE workoutexerciseid = $1', [we.id]);
+          detailedExercises.push({
+            name: exercise.exercisename,
+            category: exercise.exercisecategory,
+            sets: setRowsResult.rows // strength exercises we will have sets array
+          });
+        } else {
+          const cardioRowsResult = await client.query('SELECT duration_minutes, calories_burned FROM cardio WHERE workoutexerciseid = $1', [we.id]);
+            detailedExercises.push({
+              name: exercise.exercisename,
+              category: exercise.exercisecategory,
+              cardio: cardioRowsResult.rows[0] // for cardio we will have duration and calories burned
+            });
+        }
       }
 
       finalData.push({
@@ -217,7 +289,6 @@ app.get("/api/fetch-prs", async (req, res) => {
     client.release();
   }
 });
-
 
 
 app.listen(8080, () => {
