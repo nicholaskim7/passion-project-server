@@ -207,7 +207,7 @@ app.get("/api/fetch-workouts", async (req, res) => {
       WHERE w.userid = $1
         AND ($2::timestamptz IS NULL OR w.date >= $2)
         AND ($3::timestamptz IS NULL OR w.date <= $3)
-      ORDER BY w.date ASC
+      ORDER BY w.date ASC, we.id ASC, s.id ASC
     `;
 
     const { rows } = await client.query(query, [userId, startDate, endDate]);
