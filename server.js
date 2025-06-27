@@ -173,13 +173,32 @@ app.post("/api/log-cardio", async (req, res) => {
 
 app.get("/api/fetch-workouts", async (req, res) => {
   // Get all workouts for a specific user
-
   const client = await db.connect();
   await client.query(`SET search_path TO public`);
   const userId = 1; //hardcoded user
+
+  // query params to filter by date range
+  let { start, end } = req.query;
+
   try {
     await client.query('BEGIN');
-    const workoutsResult = await client.query('SELECT * FROM workouts WHERE userid = $1', [userId]); // rows of recorded workouts with date
+    let queryText = 'SELECT * FROM workouts WHERE userid = $1';
+    let queryParams = [userId];
+
+    if (start && end) {
+      // parse start and end strings from frontend into Date
+      const startDate = new Date(start);
+      const endDate = new Date(end);
+      
+      // inclusive to the end date
+      queryText += ' AND date >= $2 AND date <= $3';
+      queryParams.push(startDate, endDate);
+
+      // console.log("filtering from:", startDate.toISOString(), "to", endDate.toISOString());
+      // console.log("full SQL:", queryText);
+      // console.log("params:", queryParams);
+    }
+    const workoutsResult = await client.query(queryText, queryParams);
 
     const finalData = [];
 
