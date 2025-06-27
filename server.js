@@ -179,73 +179,83 @@ app.get("/api/fetch-workouts", async (req, res) => {
 
   // query params to filter by date range
   let { start, end } = req.query;
+  let startDate = start ? new Date(start) : null;
+  let endDate = end ? new Date(end) : null;
 
   try {
     await client.query('BEGIN');
-    let queryText = 'SELECT * FROM workouts WHERE userid = $1';
-    let queryParams = [userId];
 
-    if (start && end) {
-      // parse start and end strings from frontend into Date
-      const startDate = new Date(start);
-      const endDate = new Date(end);
-      
-      // inclusive to the end date
-      queryText += ' AND date >= $2 AND date <= $3';
-      queryParams.push(startDate, endDate);
+    //replace inner loops with single join query for faster look up
+    const query = `
+      SELECT
+        w.id AS workout_id,
+        w.date,
+        we.id AS workout_exercise_id,
+        e.exercisename,
+        e.exercisecategory,
+        s.reps,
+        s.weight,
+        c.duration_minutes,
+        c.calories_burned
+      FROM workouts w
+      JOIN workoutexercises we ON w.id = we.workoutid
+      JOIN exercises e ON we.exerciseid = e.id
+      LEFT JOIN sets s ON s.workoutexerciseid = we.id AND e.exercisecategory = 'Strength'
+      LEFT JOIN cardio c ON c.workoutexerciseid = we.id AND e.exercisecategory != 'Strength'
+      WHERE w.userid = $1
+        AND ($2::timestamptz IS NULL OR w.date >= $2)
+        AND ($3::timestamptz IS NULL OR w.date <= $3)
+      ORDER BY w.date ASC
+    `;
 
-      // console.log("filtering from:", startDate.toISOString(), "to", endDate.toISOString());
-      // console.log("full SQL:", queryText);
-      // console.log("params:", queryParams);
-    }
-    const workoutsResult = await client.query(queryText, queryParams);
-
-    const finalData = [];
+    const { rows } = await client.query(query, [userId, startDate, endDate]);
+    
+    const workoutsMap = new Map();
 
     // For each workout, fetch its associated workout exercises:
-    for (const workout of workoutsResult.rows) {
-      const workoutId = workout.id;
+    for (const row of rows) {
+      const workoutId = row.workout_id;
 
-      const workoutExercisesResult = await client.query('SELECT * FROM workoutexercises WHERE workoutid = $1', [workoutId]); // workoutExercises
-
-      const detailedExercises = [];
-      
-      // For each workout exercise, fetch the exercise details:
-      for (const we of workoutExercisesResult.rows) {
-        const exerciseId = we.exerciseid;
-
-        const exerciseRowsResult = await client.query('SELECT * FROM exercises WHERE id = $1', [exerciseId]); // exercises done in that particular workout
-
-        const exercise = exerciseRowsResult.rows[0];
-
-        // Then fetch the sets for each workoutExerciseId:
-        if (exercise.exercisecategory == "Strength") { // see if we need to fetch from sets or from cardio
-          const setRowsResult = await client.query('SELECT reps, weight FROM sets WHERE workoutexerciseid = $1', [we.id]);
-          detailedExercises.push({
-            name: exercise.exercisename,
-            category: exercise.exercisecategory,
-            sets: setRowsResult.rows // strength exercises we will have sets array
-          });
-        } else {
-          const cardioRowsResult = await client.query('SELECT duration_minutes, calories_burned FROM cardio WHERE workoutexerciseid = $1', [we.id]);
-            detailedExercises.push({
-              name: exercise.exercisename,
-              category: exercise.exercisecategory,
-              cardio: cardioRowsResult.rows[0] // for cardio we will have duration and calories burned
-            });
-        }
+      if (!workoutsMap.has(workoutId)) {
+        workoutsMap.set(workoutId, {
+          workoutId,
+          date: row.date,
+          exercises: []
+        });
       }
 
-      finalData.push({
-        workoutId,
-        date: workout.date,
-        exercises: detailedExercises
-      });
+      const workout = workoutsMap.get(workoutId);
+      
+      let exercise = workout.exercises.find(e => e.name === row.exercisename && e.category === row.exercisecategory);
+
+      if (!exercise) {
+        if (row.exercisecategory === "Strength") {
+          exercise = {
+            name: row.exercisename,
+            category: row.exercisecategory,
+            sets: []
+          };
+        } else {
+          exercise = {
+            name: row.exercisename,
+            category: row.exercisecategory,
+            cardio: {
+              duration_minutes: row.duration_minutes,
+              calories_burned: row.calories_burned
+            }
+          };
+        }
+        workout.exercises.push(exercise);
+      }
+
+      if (exercise.sets && row.reps !== null) {
+        exercise.sets.push({ reps: row.reps, weight: row.weight });
+      }
     }
+    await client.query('COMMIT');
 
     //console.log(JSON.stringify(finalData, null, 2));
-    res.json(finalData);
-
+    res.json([...workoutsMap.values()]);
   } catch (err) {
     await client.query('ROLLBACK');
     console.error("Error executing query", err);
