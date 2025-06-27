@@ -310,6 +310,60 @@ app.get("/api/fetch-prs", async (req, res) => {
 });
 
 
+
+//fetch users running prs based on duration and calories burned
+app.get("/api/fetch-cardio-prs", async (req, res) => {
+  const client = await db.connect();
+  const userId = 1; //hardcoded user
+  try {
+    await client.query('BEGIN');
+    const cardioPrRowsResult = await client.query(`
+      SELECT exercisename, exercisecategory, duration_minutes, calories_burned, date
+      FROM (
+        SELECT
+          e.exercisename,
+          e.exercisecategory,
+          c.duration_minutes,
+          c.calories_burned,
+          w.date,
+          ROW_NUMBER() OVER (
+            PARTITION BY e.exercisename            -- group by exercise name
+            ORDER BY c.duration_minutes DESC, c.calories_burned DESC    -- order by duration and if tie then order by calories burned
+          ) AS rn
+        FROM cardio c
+        JOIN workoutexercises we ON c.workoutexerciseid = we.Id
+        JOIN exercises e ON we.exerciseid = e.id
+        JOIN workouts w ON we.workoutid = w.id
+        WHERE e.exercisename IN ('Treadmill Run', 'Stairmaster', 'Running Outdoors', 'Stationary Bike', 'Outdoors Bike', 'Swimming')
+        AND w.userid = $1
+      ) ranked
+      WHERE rn = 1
+    `, [userId]);
+    
+    const finalCardioData = [];
+
+    for (const pr of cardioPrRowsResult.rows) {
+      finalCardioData.push({
+        key: pr.exercisename,
+        name: pr.exercisename,
+        category: pr.exercisecategory,
+        duration: pr.duration_minutes,
+        calories: pr.calories_burned,
+        date: pr.date
+      });
+    }
+    res.json(finalCardioData);
+
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error("Error executing query", err);
+    res.status(500).json({ error: 'Error fetching cardio workouts' });
+  } finally {
+    client.release();
+  }
+});
+
+
 app.listen(8080, () => {
   console.log("Server started on port 8080");
 });
