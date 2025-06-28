@@ -375,6 +375,11 @@ app.get("/api/fetch-cardio-prs", async (req, res) => {
   }
 });
 
+// route for pinging to keep server warm
+app.get('/api/ping', (req, res) => {
+  res.status(200).send('OK');
+});
+
 
 app.listen(8080, () => {
   console.log("Server started on port 8080");
