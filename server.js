@@ -1,5 +1,6 @@
 const express = require("express");
 const session = require('express-session');
+const pgSession = require('connect-pg-simple')(session);
 const bodyParser = require("body-parser");
 const app = express();
 
@@ -14,7 +15,20 @@ const corsOptions = {
   credentials: true,
 };
 
-app.use(session({ secret: process.env.SECRET }));
+app.use(session({
+  store: new pgSession({
+    pool: db,
+    tableName: 'session'
+  }),
+  secret: process.env.SECRET,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    sameSite: 'lax',
+  }
+}));
 app.use(passport.initialize());
 app.use(passport.session());
 
