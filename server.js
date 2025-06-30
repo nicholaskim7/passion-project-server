@@ -15,6 +15,14 @@ const corsOptions = {
   credentials: true,
 };
 
+const db = new Pool({
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME,
+  port: process.env.DB_PORT || 5432,
+});
+
 app.use(session({
   store: new pgSession({
     pool: db,
@@ -35,13 +43,6 @@ app.use(passport.session());
 app.use(cors(corsOptions));
 app.use(bodyParser.json());
 
-const db = new Pool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  port: process.env.DB_PORT || 5432,
-});
 
 //debug database connection 
 app.get("/debug/db", async (req, res) => {
@@ -65,11 +66,11 @@ app.get("/debug/db", async (req, res) => {
   }
 });
 
-app.post("/api/log-workout", async (req, res) => {
+app.post("/api/log-workout", isLoggedIn, async (req, res) => {
   //req received from client  example benchpress : [index 0: {reps, weight}, index 1: {reps, weight}, index 2:........}] where the index is the set number
 
   const exercises = req.body;
-  const userId = 1; //hardcoded user
+  const userId = req.user.id; // grab user id from auth
   const workoutDate = new Date(); 
 
   
@@ -131,9 +132,9 @@ app.post("/api/log-workout", async (req, res) => {
 });
 
 
-app.post("/api/log-cardio", async (req, res) => {
+app.post("/api/log-cardio", isLoggedIn, async (req, res) => {
   const cardioExercises = req.body;
-  const userId = 1; //hardcoded user
+  const userId = req.user.id; // grab id from auth
   const workoutDate = new Date();
   //console.log(cardioExercises)
 
@@ -195,11 +196,11 @@ app.post("/api/log-cardio", async (req, res) => {
 });
 
 
-app.get("/api/fetch-workouts", async (req, res) => {
+app.get("/api/fetch-workouts", isLoggedIn, async (req, res) => {
   // Get all workouts for a specific user
   const client = await db.connect();
   await client.query(`SET search_path TO public`);
-  const userId = 1; //hardcoded user
+  const userId = req.user.id; //grab id from auth
 
   // query params to filter by date range
   let { start, end } = req.query;
@@ -291,9 +292,9 @@ app.get("/api/fetch-workouts", async (req, res) => {
 
 
 //fetch users prs for bench, squat, deadlift
-app.get("/api/fetch-prs", async (req, res) => {
+app.get("/api/fetch-prs", isLoggedIn, async (req, res) => {
   const client = await db.connect();
-  const userId = 1; //hardcoded user
+  const userId = req.user.id; //grab id from auth
   try {
     await client.query('BEGIN');
     const prRowsResult = await client.query(`
@@ -346,9 +347,9 @@ app.get("/api/fetch-prs", async (req, res) => {
 
 
 //fetch users running prs based on duration and calories burned
-app.get("/api/fetch-cardio-prs", async (req, res) => {
+app.get("/api/fetch-cardio-prs", isLoggedIn, async (req, res) => {
   const client = await db.connect();
-  const userId = 1; //hardcoded user
+  const userId = req.user.id; //grab id from auth
   try {
     await client.query('BEGIN');
     const cardioPrRowsResult = await client.query(`
