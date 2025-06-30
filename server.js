@@ -1,14 +1,22 @@
 const express = require("express");
+const session = require('express-session');
 const bodyParser = require("body-parser");
 const app = express();
+
 require('dotenv').config();
 const { Pool } = require("pg");
 const cors = require("cors");
+const passport = require("passport");
+require("./auth.js"); //passport-google-oauth20
 const corsOptions = {
   origin: ["http://localhost:5173", "https://passion-project-client.vercel.app"], // only accept requests from our frontend server or hosted server
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true,
 };
+
+app.use(session({ secret: process.env.SECRET }));
+app.use(passport.initialize());
+app.use(passport.session());
 
 app.use(cors(corsOptions));
 app.use(bodyParser.json());
@@ -374,6 +382,56 @@ app.get("/api/fetch-cardio-prs", async (req, res) => {
     client.release();
   }
 });
+
+// function to check if user is logged in
+function isLoggedIn(req, res, next) {
+  req.user ? next() : res.sendStatus(401);
+}
+
+// tells the frontend if user is logged in
+app.get('/api/auth/me', (req, res) => {
+  if (req.user) {
+    res.json({ user: req.user });
+  } else {
+    res.status(401).json({ user: null });
+  }
+});
+
+
+// user auth api
+app.get('/api/auth', (req, res) => {
+  res.send('<a href="/api/auth/google">Authenticate with Google</a>');
+});
+
+//end point /auth/google
+app.get('/api/auth/google',
+  passport.authenticate('google', { scope: ['email', 'profile'] })
+);
+
+app.get('/api/google/callback',
+  passport.authenticate('google', {
+    successRedirect: '/api/protected',
+    failureRedirect: '/api/auth/failure',
+  })
+);
+
+app.get('/api/auth/failure', (req, res) => {
+  res.send('Something went wrong..');
+});
+
+// protected route
+app.get('/api/protected', isLoggedIn, (req, res) => {
+  //res.send(`Hello ${req.user.displayName}`);
+  res.json({ user: req.user });
+});
+
+//LOG out route
+app.get('/api/logout', (req, res) => {
+  req.logout();
+  req.session.destroy();
+  res.send('Goodbye!');
+});
+
 
 // route for pinging to keep server warm
 app.get('/api/ping', (req, res) => {
