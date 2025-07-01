@@ -425,7 +425,7 @@ app.get('/api/auth/google',
 
 app.get('/api/google/callback',
   passport.authenticate('google', {
-    successRedirect: '/',
+    successRedirect: '/api/protected',
     failureRedirect: '/api/auth/failure',
   })
 );
