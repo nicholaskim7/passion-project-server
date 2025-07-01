@@ -426,10 +426,14 @@ app.get('/api/auth/google',
 
 app.get('/api/google/callback',
   passport.authenticate('google', {
-    successRedirect: 'https://passion-project-client.vercel.app/',
+    successRedirect: '/api/auth/success',
     failureRedirect: '/api/auth/failure',
   })
 );
+
+app.get('/api/auth/success', (req, res) => {
+  res.sendFile(__dirname + '/public/auth-success.html');
+});
 
 app.get('/api/auth/failure', (req, res) => {
   res.send('Something went wrong..');
