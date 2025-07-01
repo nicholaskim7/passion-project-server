@@ -5,6 +5,8 @@ const bodyParser = require("body-parser");
 const app = express();
 app.set('trust proxy', 1);
 const path = require('path');
+app.use(express.static(path.join(__dirname, 'public')));
+
 
 
 require('dotenv').config();
@@ -434,7 +436,7 @@ app.get('/api/google/callback',
 );
 
 app.get('/api/auth/success', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'auth-success.html'));
+  res.sendFile(__dirname + '/public/auth-success.html');
 });
 
 app.get('/api/auth/failure', (req, res) => {
