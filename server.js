@@ -425,7 +425,7 @@ app.get('/api/auth/google',
 
 app.get('/api/google/callback',
   passport.authenticate('google', {
-    successRedirect: '/api/protected',
+    successRedirect: 'https://passion-project-client.vercel.app/',
     failureRedirect: '/api/auth/failure',
   })
 );
