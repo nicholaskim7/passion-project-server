@@ -23,6 +23,7 @@ const db = new Pool({
   port: process.env.DB_PORT || 5432,
 });
 
+app.use(cors(corsOptions));
 app.use(session({
   store: new pgSession({
     pool: db,
@@ -37,10 +38,9 @@ app.use(session({
     sameSite: 'lax',
   }
 }));
+
 app.use(passport.initialize());
 app.use(passport.session());
-
-app.use(cors(corsOptions));
 app.use(bodyParser.json());
 
 
