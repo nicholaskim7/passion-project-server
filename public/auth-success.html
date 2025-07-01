@@ -5,16 +5,10 @@
 </head>
 <body>
   <script>
-    // get user info from backend api
-    fetch('/api/auth/me', { credentials: 'include' })
-      .then(res => res.json())
-      .then(data => {
-        // send user back to open window
-        if (window.opener) {
-          window.opener.postMessage({ user: data.user }, 'https://passion-project-client.vercel.app');
-          window.close(); 
-        }
-      });
+    if (window.opener) {
+      window.opener.postMessage('trigger-fetch', 'https://passion-project-client.vercel.app');
+      window.close();
+    }
   </script>
 </body>
 </html>
