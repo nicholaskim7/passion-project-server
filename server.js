@@ -442,10 +442,19 @@ app.get('/api/protected', isLoggedIn, (req, res) => {
 });
 
 //LOG out route
-app.get('/api/logout', (req, res) => {
-  req.logout();
-  req.session.destroy();
-  res.send('Goodbye!');
+app.get('/api/logout', (req, res, next) => {
+  req.logout(err => {
+    if (err) return next(err);
+
+    req.session.destroy(err => {
+      if (err) {
+        console.error('Error destroying session:', err);
+        return res.status(500).send('Logout failed');
+      }
+      res.clearCookie('connect.sid', { path: '/' });
+      res.send('Goodbye!');
+    });
+  });
 });
 
 
