@@ -1,11 +1,18 @@
 <!DOCTYPE html>
-<html lang="en">
-  <head><title>Logging you in...</title></head>
-  <body>
-    <script>
-      setTimeout(() => {
-        window.location.href = "https://passion-project-client.vercel.app/";
-      }, 100);
-    </script>
-  </body>
+<html>
+<head>
+  <title>OAuth Success</title>
+</head>
+<body>
+  <script>
+    fetch('/api/auth/me', { credentials: 'include' })
+      .then(res => res.json())
+      .then(data => {
+        if (window.opener) {
+          window.opener.postMessage({ user: data.user }, 'https://passion-project-client.vercel.app');
+          window.close(); 
+        }
+      });
+  </script>
+</body>
 </html>
