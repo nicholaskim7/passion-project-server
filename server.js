@@ -3,6 +3,7 @@ const session = require('express-session');
 const pgSession = require('connect-pg-simple')(session);
 const bodyParser = require("body-parser");
 const app = express();
+app.set('trust proxy', 1);
 
 require('dotenv').config();
 const { Pool } = require("pg");
