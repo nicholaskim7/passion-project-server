@@ -4,6 +4,8 @@ const pgSession = require('connect-pg-simple')(session);
 const bodyParser = require("body-parser");
 const app = express();
 app.set('trust proxy', 1);
+const path = require('path');
+
 
 require('dotenv').config();
 const { Pool } = require("pg");
@@ -432,7 +434,7 @@ app.get('/api/google/callback',
 );
 
 app.get('/api/auth/success', (req, res) => {
-  res.sendFile(__dirname + '/public/auth-success.html');
+  res.sendFile(path.join(__dirname, 'public', 'auth-success.html'));
 });
 
 app.get('/api/auth/failure', (req, res) => {
