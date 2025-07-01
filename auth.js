@@ -43,6 +43,8 @@ passport.use(new GoogleStrategy({
       return cb(null, newUserRows[0]);
     } catch(err) {
       return cb(err, null);
+    } finally {
+      client.release();
     }
   }
 ));
