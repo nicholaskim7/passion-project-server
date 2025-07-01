@@ -451,7 +451,11 @@ app.get('/api/logout', (req, res, next) => {
         console.error('Error destroying session:', err);
         return res.status(500).send('Logout failed');
       }
-      res.clearCookie('connect.sid', { path: '/' });
+      res.clearCookie('connect.sid', {
+        path: '/',
+        sameSite: 'none',
+        secure: true,
+      });
       res.send('Goodbye!');
     });
   });
