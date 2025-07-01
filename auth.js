@@ -54,8 +54,10 @@ passport.serializeUser((user, done) => {
 passport.deserializeUser(async (id, done) => {
   try {
     const { rows } = await db.query('SELECT * FROM users WHERE id = $1', [id]);
+    console.log('deserializeUser result:', rows[0]);
     done(null, rows[0]);
   } catch (err) {
+    console.error('deserializeUser error:', err);
     done(err, null);
   }
 });
