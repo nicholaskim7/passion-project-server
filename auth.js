@@ -26,21 +26,22 @@ passport.use(new GoogleStrategy({
       // see if user already exists
       const {rows} = await client.query('SELECT * FROM users WHERE google_id = $1 OR email= $2', [googleId, email]);
 
+      let user;
       if (rows.length > 0) {
         // found user in db
-        return cb(null, rows[0]);
+        user = rows[0];
+      } else {
+        // otherwise create new user
+        const insertQuery = `
+        INSERT INTO users (username, email, google_id)
+        VALUES ($1, $2, $3)
+        RETURNING *;
+        `;
+        const insertValues = [username, email, googleId];
+        const {rows: newUserRows } = await client.query(insertQuery, insertValues);
+        user = newUserRows[0];
       }
-
-      // otherwise create new user
-      const insertQuery = `
-      INSERT INTO users (username, email, google_id)
-      VALUES ($1, $2, $3)
-      RETURNING *;
-      `;
-      const insertValues = [username, email, googleId];
-      const {rows: newUserRows } = await client.query(insertQuery, insertValues);
-
-      return cb(null, newUserRows[0]);
+      cb(null, user);
     } catch(err) {
       return cb(err, null);
     } finally {
