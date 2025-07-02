@@ -400,6 +400,41 @@ app.get("/api/fetch-cardio-prs", isLoggedIn, async (req, res) => {
   }
 });
 
+
+// api to fetch how many days user has worked out this week
+app.get("/api/fetch-user-activity", isLoggedIn, async (req, res) => {
+  const client = await db.connect();
+  const userId = req.user.id; //grab id from auth
+
+  const today = new Date();
+  const dayOfWeek = today.getDay();
+
+  // calculate start of week sunday
+  const startOfWeek = new Date(today);
+  startOfWeek.setDate(today.getDate() - dayOfWeek);
+  startOfWeek.setUTCHours(0, 0, 0, 0); // set to midnight UTC
+
+  // calculate end of week saturday
+  const endOfWeek = new Date(today);
+  endOfWeek.setDate(today.getDate() - dayOfWeek + 6);
+  endOfWeek.setUTCHours(23, 59, 59, 999); // set to end of day
+
+  try {
+    // count distinct dates only without their timestamp that are between the curr week
+    const result = await client.query(`SELECT COUNT(DISTINCT date::date) AS count FROM workouts WHERE userid = $1 AND date >= $2 AND date <= $3`, [userId, startOfWeek, endOfWeek]);
+    // extract count as an int
+    const daysWorkedOut = parseInt(result.rows[0].count, 10);
+    res.json({ daysWorkedOut });
+
+  } catch (err) {
+    console.error("Error executing query", err);
+    res.status(500).json({ error: 'Error fetching user activity' });
+  } finally {
+    client.release();
+  }
+});
+
+
 // function to check if user is logged in
 function isLoggedIn(req, res, next) {
   req.user ? next() : res.sendStatus(401);
