@@ -300,7 +300,6 @@ app.get("/api/fetch-prs", isLoggedIn, async (req, res) => {
   const client = await db.connect();
   const userId = req.user.id; //grab id from auth
   try {
-    await client.query('BEGIN');
     const prRowsResult = await client.query(`
       SELECT exercisename, exercisecategory, reps, weight, date
       FROM (
@@ -355,7 +354,6 @@ app.get("/api/fetch-cardio-prs", isLoggedIn, async (req, res) => {
   const client = await db.connect();
   const userId = req.user.id; //grab id from auth
   try {
-    await client.query('BEGIN');
     const cardioPrRowsResult = await client.query(`
       SELECT exercisename, exercisecategory, duration_minutes, calories_burned, date
       FROM (
