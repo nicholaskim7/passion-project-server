@@ -403,7 +403,7 @@ app.get("/api/fetch-cardio-prs", isLoggedIn, async (req, res) => {
 
 
 // api to fetch how many days user has worked out this week
-app.get("/api/fetch-user-activity", isLoggedIn, async (req, res) => {
+app.post("/api/fetch-user-activity", isLoggedIn, async (req, res) => {
   const client = await db.connect();
   const userId = req.user.id; //grab id from auth
   const timeZone = req.body.timeZone || 'UTC'; //grab user timezone from client
