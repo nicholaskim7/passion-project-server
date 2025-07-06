@@ -2,6 +2,7 @@ const express = require("express");
 const session = require('express-session');
 const pgSession = require('connect-pg-simple')(session);
 const bodyParser = require("body-parser");
+const { DateTime } = require('luxon');
 const app = express();
 app.set('trust proxy', 1);
 const path = require('path');
@@ -406,30 +407,21 @@ app.get("/api/fetch-user-activity", isLoggedIn, async (req, res) => {
   const client = await db.connect();
   const userId = req.user.id; //grab id from auth
 
-  const today = new Date();
-  const localToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-  console.log("Raw now:", today.toString());
-  console.log("LocalToday:", localToday.toString());
-  console.log("Day of week:", dayOfWeek);
-  const dayOfWeek = localToday.getDay();
+  // use CDT timezone
+  const now = DateTime.now().setZone('America/Chicago');
 
   // calculate start of week sunday
-  const startOfWeek = new Date(localToday);
-  startOfWeek.setDate(localToday.getDate() - dayOfWeek);
-  startOfWeek.setHours(0, 0, 0, 0); // set to midnight UTC
+  const startOfWeek = now.startOf('week');
 
   // calculate end of week saturday
-  const endOfWeek = new Date(localToday);
-  endOfWeek.setDate(localToday.getDate() - dayOfWeek + 6);
-  endOfWeek.setHours(23, 59, 59, 999); // set to end of day
+    const endOfWeek = startOfWeek.plus({ days: 6 }).endOf('day');
 
-  console.log("Start of week (ISO):", startOfWeek.toISOString());
-  console.log("End of week (ISO):", endOfWeek.toISOString());
-
+  console.log("Start of week:", startOfWeek.toISO());
+  console.log("End of week:", endOfWeek.toISO());
 
   try {
     // count distinct dates only without their timestamp that are between the curr week
-    const result = await client.query(`SELECT COUNT(DISTINCT date::date) AS count FROM workouts WHERE userid = $1 AND date >= $2 AND date <= $3`, [userId, startOfWeek, endOfWeek]);
+    const result = await client.query(`SELECT COUNT(DISTINCT date::date) AS count FROM workouts WHERE userid = $1 AND date >= $2 AND date <= $3`, [userId, startOfWeek.toISO(), endOfWeek.toISO()]);
     // extract count as an int
     const daysWorkedOut = parseInt(result.rows[0].count, 10);
     res.json({ daysWorkedOut });
