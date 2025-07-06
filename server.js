@@ -407,16 +407,17 @@ app.get("/api/fetch-user-activity", isLoggedIn, async (req, res) => {
   const userId = req.user.id; //grab id from auth
 
   const today = new Date();
-  const dayOfWeek = today.getDay();
+  const localToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dayOfWeek = localToday.getDay();
 
   // calculate start of week sunday
-  const startOfWeek = new Date(today);
-  startOfWeek.setDate(today.getDate() - dayOfWeek);
+  const startOfWeek = new Date(localToday);
+  startOfWeek.setDate(localToday.getDate() - dayOfWeek);
   startOfWeek.setHours(0, 0, 0, 0); // set to midnight UTC
 
   // calculate end of week saturday
-  const endOfWeek = new Date(today);
-  endOfWeek.setDate(today.getDate() - dayOfWeek + 6);
+  const endOfWeek = new Date(localToday);
+  endOfWeek.setDate(localToday.getDate() - dayOfWeek + 6);
   endOfWeek.setHours(23, 59, 59, 999); // set to end of day
 
   console.log("Start of week (ISO):", startOfWeek.toISOString());
