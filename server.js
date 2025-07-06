@@ -412,12 +412,12 @@ app.get("/api/fetch-user-activity", isLoggedIn, async (req, res) => {
   // calculate start of week sunday
   const startOfWeek = new Date(today);
   startOfWeek.setDate(today.getDate() - dayOfWeek);
-  startOfWeek.setUTCHours(0, 0, 0, 0); // set to midnight UTC
+  startOfWeek.setHours(0, 0, 0, 0); // set to midnight UTC
 
   // calculate end of week saturday
   const endOfWeek = new Date(today);
   endOfWeek.setDate(today.getDate() - dayOfWeek + 6);
-  endOfWeek.setUTCHours(23, 59, 59, 999); // set to end of day
+  endOfWeek.setHours(23, 59, 59, 999); // set to end of day
 
   try {
     // count distinct dates only without their timestamp that are between the curr week
