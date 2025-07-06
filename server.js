@@ -406,16 +406,18 @@ app.get("/api/fetch-cardio-prs", isLoggedIn, async (req, res) => {
 app.get("/api/fetch-user-activity", isLoggedIn, async (req, res) => {
   const client = await db.connect();
   const userId = req.user.id; //grab id from auth
+  const timeZone = req.body.timeZone || 'UTC'; //grab user timezone from client
 
   // use CDT timezone
-  const now = DateTime.now().setZone('America/Chicago');
+  const now = DateTime.now().setZone(timeZone);
 
   // calculate start of week sunday
   const startOfWeek = now.startOf('week');
 
   // calculate end of week saturday
-    const endOfWeek = startOfWeek.plus({ days: 6 }).endOf('day');
+  const endOfWeek = startOfWeek.plus({ days: 6 }).endOf('day');
 
+  console.log("User timezone:", timeZone);
   console.log("Start of week:", startOfWeek.toISO());
   console.log("End of week:", endOfWeek.toISO());
 
