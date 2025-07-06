@@ -407,7 +407,7 @@ app.get("/api/fetch-user-activity", isLoggedIn, async (req, res) => {
   const userId = req.user.id; //grab id from auth
 
   const today = new Date();
-  const localToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const localToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const dayOfWeek = localToday.getDay();
 
   // calculate start of week sunday
