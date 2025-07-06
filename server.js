@@ -408,6 +408,9 @@ app.get("/api/fetch-user-activity", isLoggedIn, async (req, res) => {
 
   const today = new Date();
   const localToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  console.log("Raw now:", today.toString());
+  console.log("LocalToday:", localToday.toString());
+  console.log("Day of week:", dayOfWeek);
   const dayOfWeek = localToday.getDay();
 
   // calculate start of week sunday
