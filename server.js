@@ -419,6 +419,10 @@ app.get("/api/fetch-user-activity", isLoggedIn, async (req, res) => {
   endOfWeek.setDate(today.getDate() - dayOfWeek + 6);
   endOfWeek.setHours(23, 59, 59, 999); // set to end of day
 
+  console.log("Start of week (ISO):", startOfWeek.toISOString());
+  console.log("End of week (ISO):", endOfWeek.toISOString());
+
+
   try {
     // count distinct dates only without their timestamp that are between the curr week
     const result = await client.query(`SELECT COUNT(DISTINCT date::date) AS count FROM workouts WHERE userid = $1 AND date >= $2 AND date <= $3`, [userId, startOfWeek, endOfWeek]);
