@@ -478,7 +478,7 @@ app.post('/api/upload-avatar', isLoggedIn, upload.single('avatar'), async (req, 
 
     // update the users avatar_path in PostgreSQL db
     await db.query(
-      `UPDATE users SET avatar_path = $1 WHERE user_id = $2`,
+      `UPDATE users SET avatar_path = $1 WHERE id = $2`,
       [publicUrl, userId]
     );
 
