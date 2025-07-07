@@ -7,6 +7,11 @@ const app = express();
 app.set('trust proxy', 1);
 const path = require('path');
 
+const multer = require('multer');
+const { createClient } = require('@supabase/supabase-js');
+
+// multer for memory storage
+const upload = multer({ storage: multer.memoryStorage() });
 
 require('dotenv').config();
 const { Pool } = require("pg");
@@ -18,6 +23,8 @@ const corsOptions = {
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true,
 };
+
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 const db = new Pool({
   host: process.env.DB_HOST,
@@ -437,17 +444,79 @@ app.post("/api/fetch-user-activity", isLoggedIn, async (req, res) => {
 });
 
 
+// api to upload avatar pic to supabase storage and update avatar_path to it in the storage
+app.post('/api/upload-avatar', isLoggedIn, upload.single('avatar'), async (req, res) => {
+  const file = req.file; // get the avatar file
+  const userId = req.user.id; // get user id
+
+  if (!file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+
+  const fileExt = path.extname(file.originalname);
+  // uniquely name file name with userid
+  const fileName = `avatars/${userId}${fileExt}`;
+  const bucketName = 'profile-pictures'; // supabase storage bucket
+
+  try {
+    // upload file to Supabase Storage
+    const { error: uploadError } = await supabase.storage
+      .from(bucketName)
+      .upload(fileName, file.buffer, {
+        contentType: file.mimetype,
+        upsert: true, // replace existing file with the same name
+      });
+
+    if (uploadError) {
+      console.error(uploadError);
+      return res.status(500).json({ error: 'Error uploading to Supabase' });
+    }
+
+    // get the public URL
+    const { data: publicUrlData } = supabase.storage.from(bucketName).getPublicUrl(fileName);
+    const publicUrl = publicUrlData.publicUrl;
+
+    // update the users avatar_path in PostgreSQL db
+    await db.query(
+      `UPDATE users SET avatar_path = $1 WHERE user_id = $2`,
+      [publicUrl, userId]
+    );
+
+    res.status(200).json({ message: 'Avatar uploaded successfully', avatarUrl: publicUrl });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Error uploading avatar' });
+  }
+});
+
+
+
 // function to check if user is logged in
 function isLoggedIn(req, res, next) {
   req.user ? next() : res.sendStatus(401);
 }
 
-// tells the frontend if user is logged in
-app.get('/api/auth/me', (req, res) => {
-  if (req.user) {
-    res.json({ user: req.user });
-  } else {
-    res.status(401).json({ user: null });
+// tells the frontend if user is logged in => (updated to include user profile pic)
+app.get('/api/auth/me', async (req, res) => {
+  if (!req.user) return res.status(401).json({ user: null });
+
+  const userId = req.user.id;
+
+  try {
+    const result = await db.query(
+      'SELECT name, email, avatar_path FROM users WHERE id = $1',
+      [userId]
+    );
+
+    const userProfile = result.rows[0];
+
+    // send all fields from passport session as well as profile data from db
+    res.json({ user: { ...req.user, ...userProfile } });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Failed to fetch user profile' });
   }
 });
 
