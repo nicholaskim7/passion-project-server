@@ -505,7 +505,7 @@ app.get('/api/auth/me', async (req, res) => {
 
   try {
     const result = await db.query(
-      'SELECT name, email, avatar_path FROM users WHERE id = $1',
+      'SELECT username, email, avatar_path FROM users WHERE id = $1',
       [userId]
     );
 
