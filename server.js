@@ -491,6 +491,28 @@ app.post('/api/upload-avatar', isLoggedIn, upload.single('avatar'), async (req, 
 });
 
 
+// api route that will fetch non sensitive user info for each users public profile that will be discoverable by other users
+app.get('/api/public-profile/:username', isLoggedIn, async (req, res) => {
+  // extract user name from url
+  const { username } = req.params;
+    try {
+      const result = await db.query(
+        'SELECT username, avatar_path, id FROM users WHERE username = $1',
+        [username]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'User not found'});
+      }
+
+      res.json(result.rows[0]);
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+      res.status(500).json({ error: 'Internal server error'});
+    }
+});
+
+
 
 // function to check if user is logged in
 function isLoggedIn(req, res, next) {
