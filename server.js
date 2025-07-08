@@ -494,7 +494,7 @@ app.post('/api/upload-avatar', isLoggedIn, upload.single('avatar'), async (req, 
 // api route that will fetch non sensitive user info for each users public profile that will be discoverable by other users
 app.get('/api/public-profile/:username', isLoggedIn, async (req, res) => {
   // extract user name from url
-  const { username } = req.params;
+  const username = decodeURIComponent(req.params.username);
     try {
       const result = await db.query(
         'SELECT username, avatar_path, id FROM users WHERE username = $1',
