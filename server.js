@@ -517,6 +517,7 @@ app.get('/api/public-profile/:username', isLoggedIn, async (req, res) => {
 app.get("/api/fetch-public-prs/:username", isLoggedIn, async (req, res) => {
   const client = await db.connect();
   const username = decodeURIComponent(req.params.username);
+  console.log("Decoded username:", username);
   try {
     // get user id with username
     const userIdResult = await client.query(`SELECT id FROM users WHERE username = $1`, [username]);
@@ -577,6 +578,7 @@ app.get("/api/fetch-public-prs/:username", isLoggedIn, async (req, res) => {
 // api to fetch cardio prs for public profile
 app.get("/api/fetch-public-cardio-prs/:username", isLoggedIn, async (req, res) => {
   const username = decodeURIComponent(req.params.username);
+  console.log("Decoded username:", username);
   const client = await db.connect();
   
   try {
