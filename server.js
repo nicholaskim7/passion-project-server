@@ -575,7 +575,7 @@ app.get("/api/fetch-public-prs/:username", isLoggedIn, async (req, res) => {
 
 
 // api to fetch cardio prs for public profile
-app.get("/api/fetch-cardio-prs/:username", isLoggedIn, async (req, res) => {
+app.get("/api/fetch-public-cardio-prs/:username", isLoggedIn, async (req, res) => {
   const username = decodeURIComponent(req.params.username);
   const client = await db.connect();
   
