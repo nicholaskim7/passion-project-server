@@ -493,7 +493,7 @@ app.post('/api/upload-avatar', isLoggedIn, upload.single('avatar'), async (req, 
 
 // api route that will fetch non sensitive user info for each users public profile that will be discoverable by other users
 app.get('/api/public-profile/:username', isLoggedIn, async (req, res) => {
-  // extract user name from url
+  // extract user name from url and decode it
   const username = decodeURIComponent(req.params.username);
     try {
       const result = await db.query(
@@ -512,6 +512,126 @@ app.get('/api/public-profile/:username', isLoggedIn, async (req, res) => {
     }
 });
 
+
+// api to fetch prs for public profiles
+app.get("/api/fetch-public-prs/:username", isLoggedIn, async (req, res) => {
+  const client = await db.connect();
+  const username = decodeURIComponent(req.params.username);
+  try {
+    // get user id with username
+    const userIdResult = await client.query(`SELECT id FROM users WHERE username = $1`, [username]);
+    if (userIdResult.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    const userId = userIdRows[0].id;
+
+
+    const prRowsResult = await client.query(`
+      SELECT exercisename, exercisecategory, reps, weight, date
+      FROM (
+        SELECT
+          e.exercisename,
+          e.exercisecategory,
+          s.reps,
+          s.weight,
+          w.date,
+          ROW_NUMBER() OVER (
+            PARTITION BY e.exercisename            -- group by exercise name
+            ORDER BY s.weight DESC, s.reps DESC    -- order by weight lifted and if tie then order by number of reps
+          ) AS rn
+        FROM sets s
+        JOIN workoutexercises we ON s.workoutexerciseid = we.Id
+        JOIN exercises e ON we.exerciseid = e.id
+        JOIN workouts w ON we.workoutid = w.id
+        WHERE e.exercisename IN ('Bench Press', 'Barbell Squat', 'Deadlift')
+        AND w.userid = $1
+      ) ranked
+      WHERE rn = 1
+    `, [userId]);
+    
+    const finalData = [];
+
+    for (const pr of prRowsResult.rows) {
+      finalData.push({
+        key: pr.exercisename,
+        name: pr.exercisename,
+        category: pr.exercisecategory,
+        reps: pr.reps,
+        weight: pr.weight,
+        date: pr.date
+      });
+    }
+    // console.log(JSON.stringify(finalData, null, 2));
+    res.json(finalData);
+
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error("Error executing query", err);
+    res.status(500).json({ error: 'Error fetching workouts' });
+  } finally {
+    client.release();
+  }
+});
+
+
+// api to fetch cardio prs for public profile
+app.get("/api/fetch-cardio-prs/:username", isLoggedIn, async (req, res) => {
+  const username = decodeURIComponent(req.params.username);
+  const client = await db.connect();
+  
+  try {
+    // get user id with username
+    const userIdResult = await client.query(`SELECT id FROM users WHERE username = $1`, [username]);
+    if (userIdResult.rows.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    const userId = userIdRows[0].id;
+
+    const cardioPrRowsResult = await client.query(`
+      SELECT exercisename, exercisecategory, duration_minutes, calories_burned, date
+      FROM (
+        SELECT
+          e.exercisename,
+          e.exercisecategory,
+          c.duration_minutes,
+          c.calories_burned,
+          w.date,
+          ROW_NUMBER() OVER (
+            PARTITION BY e.exercisename            -- group by exercise name
+            ORDER BY c.duration_minutes DESC, c.calories_burned DESC    -- order by duration and if tie then order by calories burned
+          ) AS rn
+        FROM cardio c
+        JOIN workoutexercises we ON c.workoutexerciseid = we.Id
+        JOIN exercises e ON we.exerciseid = e.id
+        JOIN workouts w ON we.workoutid = w.id
+        WHERE e.exercisename IN ('Treadmill Run', 'Stairmaster', 'Running Outdoors', 'Stationary Bike', 'Outdoors Bike', 'Swimming')
+        AND w.userid = $1
+      ) ranked
+      WHERE rn = 1
+    `, [userId]);
+    
+    const finalCardioData = [];
+
+    for (const pr of cardioPrRowsResult.rows) {
+      finalCardioData.push({
+        key: pr.exercisename,
+        name: pr.exercisename,
+        category: pr.exercisecategory,
+        duration: pr.duration_minutes,
+        calories: pr.calories_burned,
+        date: pr.date
+      });
+    }
+    res.json(finalCardioData);
+
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error("Error executing query", err);
+    res.status(500).json({ error: 'Error fetching cardio workouts' });
+  } finally {
+    client.release();
+  }
+});
 
 
 // function to check if user is logged in
