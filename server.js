@@ -523,7 +523,7 @@ app.get("/api/fetch-public-prs/:username", isLoggedIn, async (req, res) => {
     if (userIdResult.rows.length === 0) {
       return res.status(404).json({ error: "User not found" });
     }
-    const userId = userIdResult[0].id;
+    const userId = userIdResult.rows[0].id;
 
 
     const prRowsResult = await client.query(`
@@ -585,7 +585,7 @@ app.get("/api/fetch-cardio-prs/:username", isLoggedIn, async (req, res) => {
     if (userIdResult.rows.length === 0) {
       return res.status(404).json({ error: "User not found" });
     }
-    const userId = userIdResult[0].id;
+    const userId = userIdResult.rows[0].id;
 
     const cardioPrRowsResult = await client.query(`
       SELECT exercisename, exercisecategory, duration_minutes, calories_burned, date
