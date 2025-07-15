@@ -491,6 +491,28 @@ app.post('/api/upload-avatar', isLoggedIn, upload.single('avatar'), async (req, 
 });
 
 
+// api to search for username and similiar usernames
+app.get('/api/search-users', isLoggedIn, async (req, res) => {
+  const { q } = req.query;
+  if (!q || q.trim() === '') {
+    return res.status(400).json({error: "Query missing" });
+  }
+
+  try {
+    const client = await db.connect();
+    const query = `
+      SELECT username FROM users WHERE username ILIKE $1 LIMIT 10
+    `;
+    const values = [`%${q}%`];
+    const result = await client.query(query, values);
+    client.release();
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Database error" })
+  }
+});
+
 // api route that will fetch non sensitive user info for each users public profile that will be discoverable by other users
 app.get('/api/public-profile/:username', isLoggedIn, async (req, res) => {
   // extract user name from url and decode it
@@ -517,7 +539,7 @@ app.get('/api/public-profile/:username', isLoggedIn, async (req, res) => {
 app.get("/api/fetch-public-prs/:username", isLoggedIn, async (req, res) => {
   const client = await db.connect();
   const username = decodeURIComponent(req.params.username);
-  console.log("Decoded username:", username);
+  //console.log("Decoded username:", username);
   try {
     // get user id with username
     const userIdResult = await client.query(`SELECT id FROM users WHERE username = $1`, [username]);
@@ -578,7 +600,7 @@ app.get("/api/fetch-public-prs/:username", isLoggedIn, async (req, res) => {
 // api to fetch cardio prs for public profile
 app.get("/api/fetch-public-cardio-prs/:username", isLoggedIn, async (req, res) => {
   const username = decodeURIComponent(req.params.username);
-  console.log("Decoded username:", username);
+  //console.log("Decoded username:", username);
   const client = await db.connect();
   
   try {
