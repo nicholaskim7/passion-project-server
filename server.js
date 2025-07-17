@@ -658,6 +658,82 @@ app.get("/api/fetch-public-cardio-prs/:username", isLoggedIn, async (req, res) =
 });
 
 
+// route to insert goals
+app.post("/api/set-goals", isLoggedIn, async (req, res) => {
+  const { bench, squat, deadlift } = req.body; // grab goals from frontend form
+  const userId = req.user.id; // grab id from auth
+
+  const client = await db.connect();
+  
+  try {
+    await client.query('BEGIN');
+
+    // insert goals
+    // if user already has a goal row we update instead of creating a new row
+    const goalsResult = await client.query(
+      `INSERT INTO goals (userid, benchgoal, squatgoal, deadliftgoal)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (userid) DO UPDATE SET
+          benchgoal = EXCLUDED.benchgoal
+          squatgoal = EXCLUDED.squatgoal
+          deadliftgoal = EXCLUDED.deadliftgoal`,
+      [userId, bench, squat, deadlift]
+    );
+
+    await client.query('COMMIT');
+    res.status(200).json({ message: 'Goals saved successfully' });
+
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error("Error executing query", err);
+    res.status(500).json({ error: 'Error inserting goals' });
+
+  } finally {
+    client.release();
+  }
+});
+
+
+// route to fetch goals
+app.get("/api/fetch-goals", isLoggedIn, async (req, res) => {
+  const userId = req.user.id; // grab id from auth
+
+  const client = await db.connect();
+  
+  try {
+    await client.query('BEGIN');
+
+    // fetch goals
+    const result = await client.query(`SELECT benchgoal, squatgoal, deadliftgoal FROM goals WHERE userid = $1`,[userId]);
+
+    await client.query('COMMIT');
+
+    if (result.rows.length === 0) {
+      // no goals yet
+      return res.status(200).json({ bench: '', squat: '', deadlift: ''});
+    }
+
+    // extract exercises from the row
+    const { benchgoal, squatgoal, deadliftgoal} = result.rows[0];
+
+    // response to the client with the goals
+    res.status(200).json({
+      bench: benchgoal,
+      squat: squatgoal,
+      deadlift: deadliftgoal,
+    });
+
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error("Error executing query", err);
+    res.status(500).json({ error: 'Error fetching goals' });
+
+  } finally {
+    client.release();
+  }
+});
+
+
 // function to check if user is logged in
 function isLoggedIn(req, res, next) {
   req.user ? next() : res.sendStatus(401);
