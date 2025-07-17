@@ -674,8 +674,8 @@ app.post("/api/set-goals", isLoggedIn, async (req, res) => {
       `INSERT INTO goals (userid, benchgoal, squatgoal, deadliftgoal)
         VALUES ($1, $2, $3, $4)
         ON CONFLICT (userid) DO UPDATE SET
-          benchgoal = EXCLUDED.benchgoal
-          squatgoal = EXCLUDED.squatgoal
+          benchgoal = EXCLUDED.benchgoal,
+          squatgoal = EXCLUDED.squatgoal,
           deadliftgoal = EXCLUDED.deadliftgoal`,
       [userId, bench, squat, deadlift]
     );
