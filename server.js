@@ -23,7 +23,7 @@ const cors = require("cors");
 const passport = require("passport");
 require("./auth.js"); //passport-google-oauth20
 const corsOptions = {
-  origin: ["http://localhost:5173", "https://passion-project-client.vercel.app"], // only accept requests from our frontend server or hosted server
+  origin: ["http://localhost:5173", "https://passion-project-client.vercel.app", "https://passion-project-client-git-main-nicholas-projects-a3d3eed2.vercel.app"], // only accept requests from our frontend server or hosted server
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true,
 };
