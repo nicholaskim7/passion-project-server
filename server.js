@@ -7,6 +7,9 @@ const app = express();
 app.set('trust proxy', 1);
 const path = require('path');
 
+const { OAuth2Client } = require('google-auth-library');
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
 const multer = require('multer');
 const { createClient } = require('@supabase/supabase-js');
 
@@ -769,24 +772,24 @@ app.get('/api/auth', (req, res) => {
 });
 
 //end point /auth/google
-app.get('/api/auth/google',
-  passport.authenticate('google', { scope: ['email', 'profile'] })
-);
+// app.get('/api/auth/google',
+//   passport.authenticate('google', { scope: ['email', 'profile'] })
+// );
 
-app.get('/api/google/callback',
-  passport.authenticate('google', {
-    successRedirect: '/api/auth/success',
-    failureRedirect: '/api/auth/failure',
-  })
-);
+// app.get('/api/google/callback',
+//   passport.authenticate('google', {
+//     successRedirect: '/api/auth/success',
+//     failureRedirect: '/api/auth/failure',
+//   })
+// );
 
-app.get('/api/auth/success', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'auth-success.html'));
-});
+// app.get('/api/auth/success', (req, res) => {
+//   res.sendFile(path.join(__dirname, 'public', 'auth-success.html'));
+// });
 
-app.get('/api/auth/failure', (req, res) => {
-  res.send('Something went wrong..');
-});
+// app.get('/api/auth/failure', (req, res) => {
+//   res.send('Something went wrong..');
+// });
 
 // protected route
 app.get('/api/protected', isLoggedIn, (req, res) => {
@@ -812,6 +815,56 @@ app.get('/api/logout', (req, res, next) => {
       res.send('Goodbye!');
     });
   });
+});
+
+// New route to verify token from client and log user in
+app.post('/api/auth/verify-token', async (req, res) => {
+  const { token } = req.body;
+
+  try {
+    // 1. Verify the ID token using Google's library
+    const ticket = await client.verifyIdToken({
+      idToken: token,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    const { sub: googleId, email, name: username, picture: avatar_path } = payload;
+
+    // 2. Find or create a user in your database (logic adapted from your auth.js)
+    const { rows } = await db.query(
+      'SELECT * FROM users WHERE google_id = $1 OR email = $2',
+      [googleId, email]
+    );
+
+    let user;
+    if (rows.length > 0) {
+      // User exists
+      user = rows[0];
+    } else {
+      // Create a new user
+      const { rows: newUserRows } = await db.query(
+        `INSERT INTO users (username, email, google_id, avatar_path)
+         VALUES ($1, $2, $3, $4)
+         RETURNING *;`,
+        [username, email, googleId, avatar_path]
+      );
+      user = newUserRows[0];
+    }
+
+    // 3. Manually log the user in with Passport to create a session
+    req.login(user, (err) => {
+      if (err) {
+        console.error('Passport login error:', err);
+        return res.status(500).json({ message: 'Session login error' });
+      }
+      // On success, send back user data
+      return res.status(200).json({ message: 'Login successful', user });
+    });
+
+  } catch (error) {
+    console.error('Token verification failed:', error);
+    res.status(401).json({ message: 'Unauthorized: Invalid token' });
+  }
 });
 
 
