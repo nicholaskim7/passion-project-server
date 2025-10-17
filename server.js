@@ -6,6 +6,7 @@ const { DateTime } = require('luxon');
 const app = express();
 app.set('trust proxy', 1);
 const path = require('path');
+app.use(express.static(path.join(__dirname, 'public')));
 
 const { OAuth2Client } = require('google-auth-library');
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
